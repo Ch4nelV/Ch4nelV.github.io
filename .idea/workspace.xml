@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="fcb8036b-ffe4-403f-97e2-5d0eedecf34a" name="Changes" comment="inital push of files">
-      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+    <list default="true" id="fcb8036b-ffe4-403f-97e2-5d0eedecf34a" name="Changes" comment="favicon">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/main.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -71,7 +72,8 @@
       <updated>1729096937011</updated>
       <workItem from="1729096938036" duration="45000" />
       <workItem from="1729097001000" duration="5029000" />
-      <workItem from="1729144058625" duration="161000" />
+      <workItem from="1729144058625" duration="1319000" />
+      <workItem from="1729289703119" duration="264000" />
     </task>
     <task id="LOCAL-00001" summary="Inital comit">
       <option name="closed" value="true" />
@@ -121,7 +123,15 @@
       <option name="project" value="LOCAL" />
       <updated>1729144134634</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="favicon">
+      <option name="closed" value="true" />
+      <created>1729144290533</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1729144290533</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -144,6 +154,7 @@
     <MESSAGE value="changed title" />
     <MESSAGE value="slight adjustments" />
     <MESSAGE value="inital push of files" />
-    <option name="LAST_COMMIT_MESSAGE" value="inital push of files" />
+    <MESSAGE value="favicon" />
+    <option name="LAST_COMMIT_MESSAGE" value="favicon" />
   </component>
 </project>

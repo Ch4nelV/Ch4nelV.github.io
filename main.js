@@ -11,7 +11,6 @@ const dashboard = document.getElementById('dashboard');
 const mainContent = document.getElementById('main-content');
 const pauseOverlay = document.getElementById('pause-overlay'); // Pause overlay element
 const gameModeDescription = document.getElementById('game-mode-description'); // Game mode description element
-const volumeSlider = document.getElementById('volume'); // Volume slider element
 
 // State Variables
 let isDashboardOpen = false;
@@ -44,23 +43,19 @@ let needToSelectActiveLimb = true;
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 let oscillator = null;
 let gainNode = null;  // To control volume in game mode
+let hitSound = null;
 
 // Tone.js setup for keyboard mode
 const synth = new Tone.Synth().toDestination();
 
-// Load Hit Sounds for Hand and Body Tracking
-function loadHitSounds() {
-    const hitHand = new Audio('hit_hand.mp3'); // Path to hit_hand.mp3
-    const hitBody = new Audio('hit_body.mp3'); // Path to hit_body.mp3
-    hitHand.volume = currentVolume;
-    hitBody.volume = currentVolume;
-    // Preload audio files
-    hitHand.preload = 'auto';
-    hitBody.preload = 'auto';
-    return { hitHand, hitBody };
+// Load Hit Sound
+function loadHitSound() {
+    const sound = new Audio('hit.wav');
+    sound.volume = currentVolume;
+    return sound;
 }
 
-const { hitHand: hitHandSound, hitBody: hitBodySound } = loadHitSounds();
+hitSound = loadHitSound();
 
 // Function to start the pitch sound in game mode
 function startPitchSound() {
@@ -74,7 +69,6 @@ function startPitchSound() {
 
         oscillator.connect(gainNode).connect(audioContext.destination);
         oscillator.start();
-        console.log('Pitch sound started.');
     }
 }
 
@@ -85,52 +79,25 @@ function stopPitchSound() {
         oscillator.disconnect(); // Disconnect the oscillator
         oscillator = null;
         gainNode = null;  // Reset gainNode when oscillator stops
-        console.log('Pitch sound stopped.');
     }
-}
-
-// Function to adjust camera settings based on device type
-function getCameraSettings() {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    return {
-        width: isMobile ? 320 : 640,
-        height: isMobile ? 240 : 480,
-        frameRate: isMobile ? { ideal: 15, max: 30 } : { ideal: 30, max: 60 }
-    };
 }
 
 // Mute/Unmute functionality for both game mode and keyboard mode
 muteUnmuteButton.addEventListener('click', () => {
     isMuted = !isMuted;  // Toggle mute state
     muteUnmuteButton.innerText = isMuted ? 'Unmute' : 'Mute';
-    console.log(`Mute state changed: ${isMuted ? 'Muted' : 'Unmuted'}`);
 
     // Mute/unmute for keyboard mode (Tone.js synth)
     if (currentMode === 'keyboard') {
         synth.volume.value = isMuted ? -Infinity : 0;  // Mute or unmute Tone.js synth
-        console.log(`Keyboard mode synth volume set to: ${isMuted ? 'Muted' : 'Unmuted'}`);
     }
 
-    // Mute/unmute for hand tracking game mode and full body mode (Web Audio API oscillator and hit sounds)
+    // Mute/unmute for hand tracking game mode and full body mode (Web Audio API oscillator)
     if (currentMode === 'game' || currentMode === 'fullbody') {
         currentVolume = isMuted ? 0 : 1;  // Update currentVolume based on mute state
-        if (hitHandSound && currentMode === 'game') {
-            hitHandSound.volume = currentVolume;
-            console.log(`Hit Hand sound volume set to: ${currentVolume}`);
-        }
-        if (hitBodySound && currentMode === 'fullbody') {
-            hitBodySound.volume = currentVolume;
-            console.log(`Hit Body sound volume set to: ${currentVolume}`);
-        }
-    }
-
-    // Adjust gainNode volume if exists
-    if (gainNode) {
-        gainNode.gain.value = isMuted ? 0 : 1;
-        console.log(`Gain node volume set to: ${gainNode.gain.value}`);
+        hitSound.volume = currentVolume;  // Apply mute/unmute to the hit sound
     }
 });
-
 
 // Hand Game Mode Logic (with Web Audio API)
 function handleGameMode(results) {
@@ -148,7 +115,6 @@ function handleGameMode(results) {
         const randomIndex = getRandomInt(0, handLabels.length);
         activeHandLabel = handLabels[randomIndex];
         needToSelectActiveHand = false;
-        console.log(`Active hand selected: ${activeHandLabel}`);
     }
 
     if (results.multiHandLandmarks && results.multiHandedness) {
@@ -187,15 +153,8 @@ function handleGameMode(results) {
                 if (distance < 35) {
                     score += 1;
                     initializeEnemyPosition();
-                    if (currentMode === 'game') {
-                        if (hitHandSound) {
-                            hitHandSound.currentTime = 0; // Reset playback position
-                            hitHandSound.play().catch(error => {
-                                console.error('Error playing hit_hand sound:', error);
-                            });
-                            console.log('Hit Hand sound played.');
-                        }
-                    }
+                    hitSound.volume = currentVolume;
+                    hitSound.play();
                     // Restart the pitch sound
                     stopPitchSound();
                     startPitchSound();
@@ -211,7 +170,6 @@ function handleGameMode(results) {
     if (!activeHandFound && !needToSelectActiveHand) {
         needToSelectActiveHand = true;
         activeHandLabel = null;
-        console.log('Active hand not found. Resetting active hand selection.');
     }
 }
 
@@ -220,14 +178,12 @@ function updatePitchAndVolume(distance) {
     if (oscillator && gainNode) {
         const frequency = Math.max(100, Math.min(2000, 2000 - distance * 5));
         oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-        console.log(`Oscillator frequency set to: ${frequency} Hz`);
 
         // Adjust volume: closer distance -> higher volume
         const maxDistance = 500; // Adjust as needed
         const volume = Math.max(0, Math.min(1, (maxDistance - distance) / maxDistance));
 
         gainNode.gain.value = currentVolume * volume; // Adjust volume based on mute state
-        console.log(`Gain node volume set to: ${gainNode.gain.value}`);
     }
 }
 
@@ -242,7 +198,6 @@ function drawEnemy() {
     canvasCtx.lineWidth = 5;
     canvasCtx.strokeStyle = 'rgb(0, 200, 0)';
     canvasCtx.stroke();
-    console.log(`Enemy drawn at (${x_enemy}, ${y_enemy})`);
 }
 
 // Mediapipe Hands Setup
@@ -252,15 +207,12 @@ const hands = new Hands({
     }
 });
 
-// Adjust Mediapipe options based on device type
-const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
 hands.setOptions({
     selfieMode: true, // Set selfieMode to true
     maxNumHands: 2,   // Allow detection of both hands
-    modelComplexity: isMobileDevice ? 0 : 1, // Lower complexity for mobile
-    minDetectionConfidence: isMobileDevice ? 0.6 : 0.7, // Slightly lower for mobile
-    minTrackingConfidence: isMobileDevice ? 0.4 : 0.5
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7, // Lowered for better performance on mobile
+    minTrackingConfidence: 0.5
 });
 
 hands.onResults(onResultsHands);
@@ -272,13 +224,12 @@ const pose = new Pose({
     }
 });
 
-// Adjust Mediapipe Pose options based on device type
 pose.setOptions({
     selfieMode: true, // Set selfieMode to true
-    modelComplexity: isMobileDevice ? 1 : 2, // Lower complexity for mobile
+    modelComplexity: 1,
     smoothLandmarks: true,
-    minDetectionConfidence: isMobileDevice ? 0.5 : 0.5,
-    minTrackingConfidence: isMobileDevice ? 0.5 : 0.5
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
 });
 
 pose.onResults(onResultsPose);
@@ -286,8 +237,6 @@ pose.onResults(onResultsPose);
 // Function to handle results from Hands
 function onResultsHands(results) {
     if (isPaused) return;
-
-    console.log('Hands results received:', results);
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -309,8 +258,6 @@ function onResultsHands(results) {
 // Function to handle results from Pose
 function onResultsPose(results) {
     if (isPaused || currentMode !== 'fullbody') return;
-
-    console.log('Pose results received:', results);
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -343,7 +290,6 @@ function handleFullBodyMode(results) {
         if (needToSelectActiveLimb) {
             activeLimbIndex = getRandomInt(0, landmarksToTrack.length);
             needToSelectActiveLimb = false;
-            console.log(`Active limb selected: ${landmarksToTrack[activeLimbIndex].name}`);
         }
 
         let activeLimbFound = false;
@@ -382,15 +328,8 @@ function handleFullBodyMode(results) {
                 if (distance < 35) {
                     score += 1;
                     initializeEnemyPosition();
-                    if (currentMode === 'fullbody') {
-                        if (hitBodySound) {
-                            hitBodySound.currentTime = 0; // Reset playback position
-                            hitBodySound.play().catch(error => {
-                                console.error('Error playing hit_body sound:', error);
-                            });
-                            console.log('Hit Body sound played.');
-                        }
-                    }
+                    hitSound.volume = currentVolume;
+                    hitSound.play();
                     // Restart the pitch sound
                     stopPitchSound();
                     startPitchSound();
@@ -405,7 +344,6 @@ function handleFullBodyMode(results) {
         if (!activeLimbFound && !needToSelectActiveLimb) {
             needToSelectActiveLimb = true;
             activeLimbIndex = null;
-            console.log('Active limb not found. Resetting active limb selection.');
         }
     }
 }
@@ -434,11 +372,9 @@ function handleKeyboardMode(results) {
                 // If the note changes or no note is playing, release the last note and play the new one
                 if (isPlayingNote) {
                     synth.triggerRelease(Tone.now());
-                    console.log(`Released note: ${lastNote}`);
                 }
                 synth.triggerAttack(note, Tone.now());  // Play the note
                 synth.detune.value = detuneValue;  // Apply detune based on Y-axis
-                console.log(`Playing note: ${note} with detune: ${detuneValue} cents`);
                 lastNote = note;
                 isPlayingNote = true;
 
@@ -451,7 +387,6 @@ function handleKeyboardMode(results) {
 
             // Continuously adjust detune for the current note based on Y-axis movement
             synth.detune.value = detuneValue;
-            console.log(`Synth detune adjusted to: ${detuneValue} cents`);
         }
     } else {
         stopPlayingNote();
@@ -475,7 +410,6 @@ function handleFingerCountMode(results) {
             const x = landmarks[0].x * canvasElement.width;
             const y = landmarks[0].y * canvasElement.height;
             canvasCtx.fillText(fingerCount.toString(), x - 30, y - 30);
-            console.log(`Detected ${fingerCount} fingers for ${handedness.label} hand.`);
         }
     }
 }
@@ -501,8 +435,7 @@ function countFingers(landmarks, handedness) {
     ];
 
     const numOpenFingers = fingers.filter(isOpen => isOpen).length;
-    const totalFingers = (thumbIsOpen ? 1 : 0) + numOpenFingers;
-    return totalFingers;
+    return (thumbIsOpen ? 1 : 0) + numOpenFingers;
 }
 
 function getNoteFromX(x) {
@@ -523,7 +456,6 @@ function getDetuneFromY(y) {
 function stopPlayingNote() {
     if (isPlayingNote) {
         synth.triggerRelease(Tone.now());
-        console.log(`Released note: ${lastNote}`);
         isPlayingNote = false;
     }
 }
@@ -536,14 +468,12 @@ pausePlayButton.addEventListener('click', () => {
         stopPitchSound();   // Stop the oscillator in game mode
         pausePlayButton.innerText = 'Play';  // Update button text to "Play"
         pauseOverlay.style.visibility = 'visible';  // Show the purple pause overlay
-        console.log('Game paused.');
     } else {
         pausePlayButton.innerText = 'Pause';  // Update button text to "Pause"
         pauseOverlay.style.visibility = 'hidden';  // Hide the purple pause overlay
         if (currentMode === 'game' || currentMode === 'fullbody') {
             startPitchSound(); // Start the oscillator if resuming game mode or full body mode
         }
-        console.log('Game resumed.');
     }
 });
 
@@ -552,11 +482,10 @@ pauseOverlay.addEventListener('click', () => {
     if (isPaused) {
         isPaused = false;  // Unpause the game
         pausePlayButton.innerText = 'Pause';  // Update button text
-        pauseOverlay.style.visibility = 'hidden';  // Hide the purple pause overlay
+        pauseOverlay.style.visibility = 'hidden';  // Hide the purple overlay
         if (currentMode === 'game' || currentMode === 'fullbody') {
             startPitchSound(); // Start the oscillator if resuming game mode or full body mode
         }
-        console.log('Game resumed via overlay.');
     }
 });
 
@@ -567,7 +496,6 @@ modeSelector.addEventListener('change', (event) => {
     currentMode = event.target.value;
     resetMode();
     updateGameModeDescription(); // Update the description when mode changes
-    console.log(`Mode changed to: ${currentMode}`);
 });
 
 function resetMode() {
@@ -578,13 +506,11 @@ function resetMode() {
         pose.onResults(onResultsPose);
         hands.onResults(null);
         startPitchSound(); // Start the oscillator when entering full body mode
-        console.log('Switched to Full Body Tracking mode.');
     } else {
         hands.onResults(onResultsHands);
         pose.onResults(null);
         if (currentMode === 'game') {
             startPitchSound(); // Start the oscillator when entering game mode
-            console.log('Switched to Hand Tracking Game mode.');
         }
     }
 }
@@ -593,42 +519,25 @@ function resetMode() {
 const camera = new Camera(videoElement, {
     onFrame: async () => {
         if (!isPaused) {
-            try {
-                if (currentMode === 'fullbody') {
-                    await pose.send({ image: videoElement });
-                } else {
-                    await hands.send({ image: videoElement });
-                }
-            } catch (error) {
-                console.error('Error processing frame:', error);
+            if (currentMode === 'fullbody') {
+                await pose.send({ image: videoElement });
+            } else {
+                await hands.send({ image: videoElement });
             }
         }
     },
-    width: getCameraSettings().width,
-    height: getCameraSettings().height,
-    frameRate: getCameraSettings().frameRate
+    width: window.innerWidth < 768 ? 320 : 640, // Lower resolution for mobile
+    height: window.innerWidth < 768 ? 240 : 480
 });
 
 // Start the camera after the page has fully loaded
 window.addEventListener('load', () => {
-    console.log('Attempting to start the camera...');
-    camera.start().then(() => {
-        console.log('Camera started successfully.');
-    }).catch(error => {
-        console.error('Error starting camera:', error);
-        alert('Unable to access the camera. Please check your permissions.');
-    });
+    camera.start();
 });
 
 // Handle orientation changes
 window.addEventListener('resize', () => {
     adjustCanvasSize();
-    // Update camera settings if needed
-    camera.setOptions({
-        width: getCameraSettings().width,
-        height: getCameraSettings().height,
-        frameRate: getCameraSettings().frameRate
-    });
 });
 
 // Dashboard toggle functionality
@@ -637,25 +546,20 @@ toggleButton.addEventListener('click', () => {
         dashboard.classList.remove('open');
         mainContent.classList.remove('open');
         toggleButton.classList.remove('open');
-        console.log('Dashboard closed.');
     } else {
         dashboard.classList.add('open');
         mainContent.classList.add('open');
         toggleButton.classList.add('open');
-        console.log('Dashboard opened.');
     }
     isDashboardOpen = !isDashboardOpen;
 });
 
 // Adjust canvas size to match video size
 function adjustCanvasSize() {
-    if (videoElement.videoWidth && videoElement.videoHeight) {
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        initializeEnemyPosition(); // Re-initialize enemy position after canvas size changes
-        console.log(`Canvas size adjusted to: ${canvasElement.width}x${canvasElement.height}`);
-    }
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    initializeEnemyPosition(); // Re-initialize enemy position after canvas size changes
 }
 
 // Adjust canvas size once the video metadata is loaded
@@ -673,7 +577,6 @@ const gameModeDescriptions = {
 function updateGameModeDescription() {
     const description = gameModeDescriptions[currentMode] || '';
     gameModeDescription.textContent = description;
-    console.log(`Game mode description updated for: ${currentMode}`);
 }
 
 // Call the function initially to set the default description
@@ -682,27 +585,10 @@ updateGameModeDescription();
 // Audio Context Resume on User Interaction (for browsers that require it)
 document.body.addEventListener('click', () => {
     if (audioContext.state !== 'running') {
-        audioContext.resume().then(() => {
-            console.log('AudioContext resumed.');
-        });
+        audioContext.resume();
     }
     // Also resume Tone.js context
     if (Tone.context.state !== 'running') {
-        Tone.context.resume().then(() => {
-            console.log('Tone.js AudioContext resumed.');
-        });
+        Tone.context.resume();
     }
 }, { once: true });
-
-// Function to ensure camera settings are updated on orientation change
-function handleOrientationChange() {
-    adjustCanvasSize();
-    camera.setOptions({
-        width: getCameraSettings().width,
-        height: getCameraSettings().height,
-        frameRate: getCameraSettings().frameRate
-    });
-}
-
-// Listen for orientation changes
-window.addEventListener('orientationchange', handleOrientationChange);
